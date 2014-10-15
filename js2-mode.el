@@ -271,6 +271,29 @@ lines, it won't be indented additionally:
   :type 'symbol)
 (js2-mark-safe-local 'js2-pretty-multiline-declarations 'symbolp)
 
+(defcustom js2-indent-chained nil
+  "Non-nil to indent chained method/properties:
+
+  someObject
+    .someMethod()
+    .someProperty
+      .prop2 // manually indent extra to signify change of scope
+      .prop3 // manually indent extra to signify change of scope
+    .prop4
+
+  nil to line up chained method/properties with the previous line
+
+  someObject
+  .someMethod()
+  .someProperty
+    .prop2 // manually indent extra to signify change of scope
+    .prop3 // automatically match
+  .prop4   // need to manually go back
+"
+  :group 'js2-mode
+  :type 'symbol)
+(js2-mark-safe-local 'js2-indent-chained 'symbolp)
+
 (defcustom js2-indent-switch-body nil
   "When nil, case labels are indented on the same level as the
 containing switch statement.  Otherwise, all lines inside
@@ -9869,6 +9892,20 @@ to a multiline declaration statement.  See `js2-pretty-multiline-declarations'."
           (goto-char (match-end 0))
           (1+ (current-column)))))))
 
+(defun js2-previous-command-indentation ()
+  "Return the indentation column of the previous line. If this is the first line of a block, return nil"
+  (save-excursion
+    (back-to-indentation)
+    (js2-backward-sws)
+    ;; if this is the start of a block ,return nil
+    (if
+        (or (eq (char-before) ?\{) (eq (char-before) ?\[))
+        nil
+      (when (eq (char-before) ?\) ) (backward-list))
+      (back-to-indentation)
+      (current-column)
+      )))
+
 (defun js2-ctrl-statement-indentation ()
   "Return the proper indentation of current line if it is a control statement.
 Returns an indentation if this line starts the body of a control
@@ -9941,14 +9978,17 @@ In particular, return the buffer position of the first `for' kwd."
     (let* ((ctrl-stmt-indent (js2-ctrl-statement-indentation))
            (at-closing-bracket (looking-at "[]})]"))
            (same-indent-p (or at-closing-bracket
-                              (looking-at "\\<case\\>[^:]")
-                              (and (looking-at "\\<default:")
+                              (looking-at "\\<case\\>[ \t]*[^:]")
+                              (and (looking-at "\\<default[ \t]*:")
                                    (save-excursion
                                      (js2-backward-sws)
                                      (not (memq (char-before) '(?, ?{)))))))
            (continued-expr-p (js2-continued-expression-p))
            (declaration-indent (and js2-pretty-multiline-declarations
                                     (js2-multiline-decl-indentation)))
+           (chained-indent (and (looking-at "\\.")
+                                (not js2-indent-chained)
+                                (js2-previous-command-indentation)))
            (bracket (nth 1 parse-status))
            beg indent)
       (cond
@@ -9961,6 +10001,8 @@ In particular, return the buffer position of the first `for' kwd."
                            (goto-char beg)
                            (point-at-bol)))) ; at or after first loop?
         (js2-array-comp-indentation parse-status beg))
+
+       (chained-indent)
 
        (ctrl-stmt-indent)
 
