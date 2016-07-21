@@ -11686,7 +11686,8 @@ Buffer edit spans from BEG to END and is of length LEN."
   "Re-parse current buffer after user finishes some data entry.
 If we get any user input while parsing, including cursor motion,
 we discard the parse and reschedule it.  If FORCE is nil, then the
-buffer will only rebuild its `js2-mode-ast' if the buffer is dirty."
+buffer will only rebuild its `js2-mode-ast' if the buffer is dirty." 
+  (interactive)
   (let (time
         interrupted-p
         (js2-compiler-strict-mode js2-mode-show-strict-warnings))
